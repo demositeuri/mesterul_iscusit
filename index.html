@@ -43,7 +43,7 @@
   --font-b:"Inter",system-ui,sans-serif;
 }
 *{box-sizing:border-box;margin:0;padding:0}
-html{scroll-behavior:smooth}
+html{scroll-behavior:smooth;scroll-padding-top:88px}
 body{
   font-family:var(--font-b);
   background:var(--bg);
@@ -377,11 +377,11 @@ footer{padding:clamp(3rem,5vw,4rem) 0 2rem;border-top:1px solid var(--border);ba
 @media(max-width:960px){.cookie{bottom:74px}.cookie-actions{width:100%}.cookie-actions .btn{flex:1}}
 
 /* ============ REVEAL ANIM ============ */
-.reveal{opacity:0;transform:translateY(26px);transition:opacity .7s var(--ease),transform .7s var(--ease)}
+.reveal{opacity:0;transform:translateY(32px);transition:opacity .95s var(--ease),transform .95s var(--ease)}
 .reveal.in{opacity:1;transform:none}
-.reveal[data-d="1"]{transition-delay:.08s}
-.reveal[data-d="2"]{transition-delay:.16s}
-.reveal[data-d="3"]{transition-delay:.24s}
+.reveal[data-d="1"]{transition-delay:.1s}
+.reveal[data-d="2"]{transition-delay:.2s}
+.reveal[data-d="3"]{transition-delay:.3s}
 
 /* ============ RESPONSIVE ============ */
 @media(max-width:960px){
@@ -885,6 +885,68 @@ footer{padding:clamp(3rem,5vw,4rem) 0 2rem;border-top:1px solid var(--border);ba
       document.body.style.setProperty('--x', e.clientX + 'px');
       document.body.style.setProperty('--y', e.clientY + 'px');
     }, {passive:true});
+  }
+
+  /* ---- smooth momentum scroll (desktop, Lenis-style) ---- */
+  var canSmooth = !reduce && window.matchMedia('(pointer:fine)').matches;
+  if(canSmooth){
+    document.documentElement.style.scrollBehavior = 'auto'; // evităm dublarea cu smooth nativ
+    var EASE = 0.075;          // mai mic = curgere mai lungă, mai relaxată
+    var HEADER_OFFSET = 84;
+    var target = window.scrollY, current = target, running = false;
+    var maxY = function(){ return Math.max(0, document.documentElement.scrollHeight - window.innerHeight); };
+    var clamp = function(v){ return Math.max(0, Math.min(maxY(), v)); };
+    var sync = function(){ current = target = window.scrollY; };
+    var start = function(){ if(!running){ running = true; requestAnimationFrame(loop); } };
+    function loop(){
+      var diff = target - current;
+      if(Math.abs(diff) < 0.4){ current = target; window.scrollTo(0, Math.round(current)); running = false; return; }
+      current += diff * EASE;
+      window.scrollTo(0, current);
+      requestAnimationFrame(loop);
+    }
+    window.addEventListener('wheel', function(e){
+      if(e.ctrlKey) return;                       // lăsăm pinch-zoom
+      e.preventDefault();
+      if(!running) sync();
+      var d = e.deltaY;
+      if(e.deltaMode === 1) d *= 16; else if(e.deltaMode === 2) d *= window.innerHeight;
+      target = clamp(target + d);
+      start();
+    }, {passive:false});
+    window.addEventListener('keydown', function(e){
+      var t = e.target;
+      if(t && (/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || t.isContentEditable)) return;
+      var vh = window.innerHeight, step;
+      switch(e.key){
+        case 'PageDown': step = vh*0.9; break;
+        case 'PageUp': step = -vh*0.9; break;
+        case 'ArrowDown': step = 100; break;
+        case 'ArrowUp': step = -100; break;
+        case ' ': step = e.shiftKey ? -vh*0.9 : vh*0.9; break;
+        case 'Home': if(!running) sync(); target = 0; start(); e.preventDefault(); return;
+        case 'End': if(!running) sync(); target = maxY(); start(); e.preventDefault(); return;
+        default: return;
+      }
+      e.preventDefault();
+      if(!running) sync();
+      target = clamp(target + step);
+      start();
+    });
+    document.querySelectorAll('a[href^="#"]').forEach(function(a){
+      a.addEventListener('click', function(e){
+        var id = a.getAttribute('href');
+        if(id.length < 2) return;
+        var el = document.querySelector(id);
+        if(!el) return;
+        e.preventDefault();
+        if(!running) sync();
+        target = clamp(el.getBoundingClientRect().top + window.scrollY - HEADER_OFFSET);
+        start();
+      });
+    });
+    window.addEventListener('resize', function(){ target = clamp(target); }, {passive:true});
+    window.addEventListener('scroll', function(){ if(!running) sync(); }, {passive:true});
   }
 
   /* ---- reveal on scroll ---- */
